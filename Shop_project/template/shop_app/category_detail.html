@@ -1,0 +1,301 @@
+{% extends 'shop_app/base.html' %}
+
+{% block title %}{{ category.name }} - N.S.Rao & Co{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <!-- Category Header -->
+        <div class="col-12 mb-4">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'shop:home' %}">Home</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'shop:product_list' %}">Products</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">{{ category.name }}</li>
+                </ol>
+            </nav>
+            
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="mb-2">{{ category.name }}</h1>
+                    <p class="text-muted mb-0">
+                        {% if products %}
+                        Showing {{ products.start_index }}-{{ products.end_index }} of {{ products.paginator.count }} products in {{ category.name }}
+                        {% else %}
+                        No products found in {{ category.name }}
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-secondary" id="grid-view">
+                        <i class="fas fa-th"></i>
+                    </button>
+                    <button class="btn btn-outline-secondary" id="list-view">
+                        <i class="fas fa-list"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Products Grid -->
+        {% if products %}
+        <div class="col-12">
+            <div class="product-grid" id="products-container">
+                {% for product in products %}
+                <div class="card h-100 product-card">
+                    {% if product.images.first %}
+                    <img src="{{ product.images.first.image.url }}" class="card-img-top" alt="{{ product.name }}" style="height: 250px; object-fit: cover;">
+                    {% else %}
+                    <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 250px;">
+                        <i class="fas fa-tshirt" style="font-size: 3rem; color: #ccc;"></i>
+                    </div>
+                    {% endif %}
+                    <div class="card-body d-flex flex-column">
+                        <div class="mb-2">
+                            {% if product.is_on_sale %}
+                            <span class="badge bg-danger">Sale</span>
+                            {% endif %}
+                            {% if product.is_featured %}
+                            <span class="badge bg-warning">Featured</span>
+                            {% endif %}
+                            <span class="badge bg-info">{{ product.get_gender_display }}</span>
+                        </div>
+                        <h5 class="card-title">{{ product.name }}</h5>
+                        <p class="card-text text-muted">{{ product.description|truncatewords:15 }}</p>
+                        <div class="mt-auto">
+                            <div class="mb-3">
+                                {% if product.is_on_sale %}
+                                <span class="original-price">₹{{ product.price }}</span>
+                                <span class="price sale-price">₹{{ product.current_price }}</span>
+                                {% else %}
+                                <span class="price">₹{{ product.current_price }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="d-flex gap-2">
+                                <a href="{% url 'shop:product_detail' product.slug %}" class="btn btn-primary flex-fill">
+                                    <i class="fas fa-eye me-1"></i>View
+                                </a>
+                                <button class="btn btn-secondary add-to-cart" data-product-id="{{ product.id }}">
+                                    <i class="fas fa-cart-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Pagination -->
+            {% if products.has_other_pages %}
+            <nav aria-label="Product pagination" class="mt-5">
+                <ul class="pagination justify-content-center">
+                    {% if products.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ products.previous_page_number }}">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    {% for num in products.paginator.page_range %}
+                        {% if products.number == num %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                        {% elif num > products.number|add:'-3' and num < products.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if products.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ products.next_page_number }}">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+
+        {% else %}
+        <div class="col-12">
+            <div class="text-center py-5">
+                <i class="fas fa-tshirt" style="font-size: 4rem; color: #ccc; margin-bottom: 1rem;"></i>
+                <h3>No Products Found</h3>
+                <p class="text-muted">No products available in {{ category.name }} at the moment.</p>
+                <a href="{% url 'shop:product_list' %}" class="btn btn-primary">
+                    <i class="fas fa-undo me-2"></i>Browse All Products
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add to Cart Modal -->
+<div class="modal fade" id="addToCartModal" tabindex="-1" aria-labelledby="addToCartModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addToCartModalLabel">Add to Cart</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addToCartForm">
+                    <div class="mb-3">
+                        <label for="quantity" class="form-label">Quantity</label>
+                        <input type="number" class="form-control" id="quantity" name="quantity" value="1" min="1" max="10">
+                    </div>
+                    <div class="mb-3">
+                        <label for="size" class="form-label">Size</label>
+                        <select class="form-select" id="size" name="size">
+                            <option value="">Select Size</option>
+                            <option value="XS">XS</option>
+                            <option value="S">S</option>
+                            <option value="M">M</option>
+                            <option value="L">L</option>
+                            <option value="XL">XL</option>
+                            <option value="XXL">XXL</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmAddToCart">
+                    <i class="fas fa-cart-plus me-2"></i>Add to Cart
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Success Toast -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="successToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <i class="fas fa-check-circle text-success me-2"></i>
+            <strong class="me-auto">Success</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body" id="toastMessage">
+            Product added to cart successfully!
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Add to cart functionality
+    const addToCartButtons = document.querySelectorAll('.add-to-cart');
+    const addToCartModal = new bootstrap.Modal(document.getElementById('addToCartModal'));
+    const confirmAddToCartBtn = document.getElementById('confirmAddToCart');
+    const successToast = new bootstrap.Toast(document.getElementById('successToast'));
+    let currentProductId = null;
+
+    addToCartButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            currentProductId = this.dataset.productId;
+            addToCartModal.show();
+        });
+    });
+
+    confirmAddToCartBtn.addEventListener('click', function() {
+        const quantity = document.getElementById('quantity').value;
+        const size = document.getElementById('size').value;
+        
+        fetch('{% url "shop:add_to_cart" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({
+                product_id: currentProductId,
+                quantity: quantity,
+                size: size
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('toastMessage').textContent = data.message;
+                successToast.show();
+                addToCartModal.hide();
+                
+                // Update cart count if it exists
+                const cartCount = document.querySelector('.cart-count');
+                if (cartCount && data.cart_count) {
+                    cartCount.textContent = data.cart_count;
+                }
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while adding to cart.');
+        });
+    });
+
+    // Grid/List view toggle
+    const gridViewBtn = document.getElementById('grid-view');
+    const listViewBtn = document.getElementById('list-view');
+    const productsContainer = document.getElementById('products-container');
+
+    gridViewBtn.addEventListener('click', function() {
+        productsContainer.classList.remove('list-view');
+        productsContainer.classList.add('grid-view');
+        gridViewBtn.classList.add('active');
+        listViewBtn.classList.remove('active');
+    });
+
+    listViewBtn.addEventListener('click', function() {
+        productsContainer.classList.remove('grid-view');
+        productsContainer.classList.add('list-view');
+        listViewBtn.classList.add('active');
+        gridViewBtn.classList.remove('active');
+    });
+});
+</script>
+
+<style>
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 2rem;
+}
+
+.product-grid.list-view {
+    grid-template-columns: 1fr;
+}
+
+.product-grid.list-view .product-card {
+    flex-direction: row;
+    max-width: none;
+}
+
+.product-grid.list-view .card-img-top {
+    width: 200px;
+    height: 200px !important;
+    flex-shrink: 0;
+}
+
+.product-grid.list-view .card-body {
+    flex: 1;
+}
+
+@media (max-width: 768px) {
+    .product-grid {
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 1rem;
+    }
+}
+</style>
+{% endblock %} 
